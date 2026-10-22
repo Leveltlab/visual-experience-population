@@ -26,12 +26,7 @@
   "decoding_train_fraction": 0.8,
   "decoding_test_fraction": 0.2,
   "signal_description": "Raw deconvolved calcium activity",
-  "baseline_audit_window": [
-    -1,
-    0
-  ],
   "prediction_ties": "Smallest class index within 1e-10 * max(1, max absolute score) of the maximum score",
-  "analysis_revision": "2026-10-20 N10 Ledoit-Wolf LDA primary; empirical LDA and SVM preserved as controls",
   "lda_shrinkage": {
     "estimator": "Ledoit-Wolf",
     "residuals": "Training trials minus their training class mean, pooled across classes",

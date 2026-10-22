@@ -1,10 +1,9 @@
 """B supplement: same-direction cosine across contrast pools with split-half benchmark."""
 
-import json
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cosine as scipy_cosine
-from analysis_config import DATA, OUT, ROOT, LABELS, ids_for, manifest, sha
+from analysis_config import DATA, OUT, LABELS, ids_for, manifest
 from geometry.statistics import finite_mean, interval, unit_vectors
 from geometry.cosine import ANGLES, centered_cosines
 
@@ -57,7 +56,7 @@ def compare_vectors(targets, reference):
 def analyze():
     (DEST / "populations").mkdir(parents=True, exist_ok=True)
     populations = manifest()["populations"]
-    rows, direction_rows, coverage, hashes = [], [], [], {}
+    rows, direction_rows, coverage = [], [], []
     reference_error = 0.0
     for p in populations:
         path = DATA / "responses" / f"s{p['sid']:03d}.npz"
@@ -125,9 +124,6 @@ def analyze():
             reference_trial_rows=reference_rows,
             heldout_trial_rows=heldout_rows,
         )
-        hashes[str(p["pid"])] = dict(
-            response=sha(path), selection=sha(DATA / "selections" / f"p{p['pid']:03d}.npy")
-        )
     sessions = pd.DataFrame(rows)
     mouse = sessions.groupby(["area", "fi", "mouse", "metric", "pair"], as_index=False).value.agg(
         lambda x: np.mean(x.to_numpy())
@@ -161,41 +157,4 @@ def analyze():
         ("individual_directions_session.csv", pd.DataFrame(direction_rows)),
     ]:
         frame.to_csv(DEST / name, index=False)
-    validation = dict(
-        validated=True,
-        populations=len(populations),
-        unique_mice=int(mouse.mouse.nunique()),
-        n=10,
-        draws=1000,
-        lower_trials_per_direction=30,
-        reference_trials_per_direction=15,
-        high_heldout_trials_per_direction=15,
-        split_seed=[20261020, 50, "population_id"],
-        split="Uniform random 15/15 partition of the 30 high-pool trials per direction and draw; not stratified by contrast. Same reference half for all four endpoints.",
-        lower_pairs_percent=(np.array(manifest()["contrasts"])[:6].reshape(3, 2) * 100).tolist(),
-        reference_pair_percent=(np.array(manifest()["contrasts"])[6:] * 100).tolist(),
-        response_window_seconds=[0, 0.5],
-        centering="Subtract the mean of eight direction centroids separately in each contrast pool or high-contrast half.",
-        cosine="Full N10 cosine of the same direction in each target and the shared 15-trial reference, within each draw.",
-        aggregation="Equal eight directions per draw, valid draws per session, equal sessions within mouse, equal mice.",
-        intervals="Pointwise 95% whole-mouse bootstrap intervals, 5000 resamples. Descriptive; no new significance tests.",
-        missing="Cosine with a zero-length vector is undefined. All eight directions must be finite for a draw.",
-        min_cosine_valid_draws=min(r["valid_draws"] for r in coverage if r["metric"] == "cosine"),
-        max_reference_cosine_matrix_error=reference_error,
-        numerical_checks=[
-            "15+15 trials per direction per pool",
-            "no shared trials between lower and reference pools",
-            "reference matrix matches flagship",
-            "disjoint 15/15 halves reconstruct full centroid",
-            "SciPy cosine references in every population",
-            "bounded cosine",
-        ],
-        source_hashes=hashes,
-        code_sha256=sha(__file__),
-        helpers_sha256={
-            name: sha(ROOT / name)
-            for name in ["geometry/statistics.py", "geometry/cosine.py", "analysis_config.py"]
-        },
-    )
-    (DEST / "validation.json").write_text(json.dumps(validation, indent=2) + "\n")
-    return groups, validation
+    return groups

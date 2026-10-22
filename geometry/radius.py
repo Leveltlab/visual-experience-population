@@ -1,7 +1,6 @@
-import json
 import numpy as np
 import pandas as pd
-from analysis_config import DATA, OUT, LABELS, ids_for, manifest, sha
+from analysis_config import DATA, OUT, LABELS, ids_for, manifest
 from geometry.cosine import pooled_centroids
 from geometry.statistics import interval
 from decoding.pooled import source
@@ -26,7 +25,6 @@ def run():
     DEST.mkdir(parents=True, exist_ok=True)
     rows = []
     audit = []
-    inputs = {}
     for p in manifest()["populations"]:
         response = DATA / "responses" / f"s{p['sid']:03d}.npz"
         with np.load(response) as z:
@@ -58,9 +56,6 @@ def run():
         }
         for level, values in levels.items():
             audit.append(dict(**common, level=level, value=float(np.mean(values))))
-        inputs[str(p["pid"])] = dict(
-            response=sha(response), selection=sha(DATA / "selections" / f"p{p['pid']:03d}.npy")
-        )
     sessions = pd.DataFrame(rows)
     mice = sessions.groupby(["area", "fi", "mouse"], as_index=False).value.mean()
     groups = []
@@ -86,23 +81,3 @@ def run():
     am = audit.groupby(["area", "fi", "mouse", "level"], as_index=False).value.mean()
     ag = am.groupby(["area", "fi", "level"], as_index=False).value.mean()
     ag.to_csv(DEST / "pca_averaging_audit_groups.csv", index=False)
-    (DEST / "radius_validation.json").write_text(
-        json.dumps(
-            dict(
-                validated=True,
-                populations=len(sessions),
-                draws=1000,
-                n=10,
-                trials_per_direction=30,
-                directions=8,
-                definition="Mean over eight directions of squared Euclidean norm of each centered 30-trial centroid in full N10 space; compute before averaging draws, sessions and mice. No division by neuron count. Equal-mouse group means and 95% whole-mouse bootstrap intervals.",
-                caveat="All-trial centroid radius includes finite-trial noise; it is not a noise-unbiased estimate or the radius of the averaged PCA overlay.",
-                pca_audit="Top-three fraction fitted separately to each N10 draw/cloud, then averaged draws, sessions, mice. These are individual-cloud upper bounds, not variance retained by the displayed shared group PCA axes.",
-                inputs=inputs,
-                source=sha(__file__),
-            ),
-            indent=2,
-        )
-        + "\n"
-    )
-    print(ag.groupby("level").value.agg(["min", "median", "max"]).to_string())

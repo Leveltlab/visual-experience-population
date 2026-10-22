@@ -1,6 +1,5 @@
 args <- commandArgs(trailingOnly=TRUE)
 root <- args[1]
-.libPaths(c(args[2], .libPaths()))
 library(nparLD)
 stopifnot(as.character(packageVersion('nparLD')) == '2.3.3')
 for (name in c('euclidean', 'cosine_validation')) {
@@ -18,6 +17,4 @@ for (name in c('euclidean', 'cosine_validation')) {
  tab$p_raw <- exp(tab$log_p)
  tab$p_holm <- p.adjust(tab$p_raw,method='holm')
  write.csv(tab,file.path(root,paste0('factorial_',name,'.csv')),row.names=FALSE)
- saveRDS(fit,file.path(root,paste0('fit_',name,'.rds')))
 }
-capture.output(sessionInfo(),file=file.path(root,'R_session_info.txt'))

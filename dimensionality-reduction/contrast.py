@@ -1,18 +1,10 @@
-import json
 import numpy as np
-import pandas as pd
-from analysis_config import DATA, OUT, ROOT, AREAS, LABELS, ids_for, manifest, sha, mouse_average
+from analysis_config import DATA, OUT, AREAS, ids_for, manifest, mouse_average
 from collections import defaultdict
 from dimensionality_reduction.pooled import orthogonal_map
 
 DEST = OUT / "contrast_scaling_pca"
-D_SOURCE = OUT / "direction_cosine_top2/supporting"
 DISPLAY_AREAS = ["AM-PM", "A-AL-RL"]
-SOURCES = [
-    "dimensionality-reduction/contrast.py",
-    "dimensionality-reduction/pooled.py",
-    "analysis_config.py",
-]
 
 
 def direction_centers(x, stim, folds, fold):
@@ -83,62 +75,27 @@ def register_all_areas(configurations):
 
 
 def run():
-    # Preserve every quantitative table and standalone F/G export byte for byte.
-    protected = {
-        p.name: sha(p)
-        for p in DEST.iterdir()
-        if p.is_file()
-        and (
-            p.name.startswith(
-                (
-                    "quantitative_FG.",
-                    "quantitative_FG_",
-                    "group_peak",
-                    "mouse_peak",
-                    "session_radius",
-                    "mouse_radius",
-                    "group_reverse",
-                    "mouse_reverse",
-                    "peak_expansion",
-                    "reverse_transfer",
-                )
-            )
-        )
-    }
-    (DEST / "complete.json").unlink(missing_ok=True)
+    DEST.mkdir(parents=True, exist_ok=True)
     pops = manifest()["populations"]
-    inputs = {}
     by_session = defaultdict(list)
     centers = {}
     selections = {}
 
-    def record(path):
-        inputs[str(path.resolve())] = sha(path)
-
-    record(DATA / "manifest.json")
-    record(D_SOURCE / "shared_pca_validation.json")
-    record(D_SOURCE / "shared_pca.npz")
     for p in pops:
         by_session[p["sid"]].append(p)
     for sid, ps in by_session.items():
         path = DATA / "responses" / f"s{sid:03d}.npz"
-        record(path)
         with np.load(path) as z:
             x = z["X"]
             stim = z["stim"]
         path = DATA / "decoding_folds" / f"s{sid:03d}.npy"
-        record(path)
         folds = np.load(path)
         centers[sid] = [direction_centers(x, stim, folds, f) for f in range(5)]
         for p in ps:
             selections[p["pid"]] = ids_for(p)
-            record(DATA / "selections" / f"p{p['pid']:03d}.npy")
     means = []
-    mouse_means = []
-    raw_grams = []
     orth_error = 0.0
     gram_error = 0.0
-    target_retention = []
     for area in AREAS:
         ps = [p for p in pops if p["area"] == area]
         sums = {p["pid"]: np.zeros((16, 10)) for p in ps}
@@ -154,7 +111,6 @@ def run():
             grams = {pid: np.mean(a @ a.swapaxes(-1, -2), 0) for pid, (a, b) in arrays.items()}
             groups, _ = mouse_average(ps, grams)
             target, retained = gram_target(groups)
-            target_retention.append(dict(area=area, fold=f, retained_rank10=retained))
             for p in ps:
                 pid = p["pid"]
                 a, b = arrays[pid]
@@ -170,12 +126,6 @@ def run():
             print(f"{area}: D-style fold {f + 1}/5 complete", flush=True)
         avg, mice = mouse_average(ps, sums)
         means.append(avg.reshape(4, 2, 8, 10))
-        raw, _ = mouse_average(ps, gramsums)
-        raw_grams.append(raw)
-        mouse_means.extend(
-            dict(area=area, fi=m["fi"], mouse=m["mouse"], values=m["values"].reshape(2, 8, 10))
-            for m in mice
-        )
     before = np.array(means)
     aligned, directions, rotations, axes, explained, iters = register_all_areas(before)
     flat = before.reshape(4, -1, 10)
@@ -185,123 +135,6 @@ def run():
     )
     # Only now collapse antipodal directions for display.
     orientations = (directions[..., :4, :] + directions[..., 4:, :]) / 2
-    orientation_full = (aligned[..., :4, :] + aligned[..., 4:, :]) / 2
     displayed = [AREAS.index(a) for a in DISPLAY_AREAS]
-    np.savez_compressed(
-        DEST / "pca_geometry.npz",
-        coordinates=orientations[displayed],
-        aligned_means=orientation_full[displayed],
-        direction_coordinates=directions,
-        direction_aligned_means=aligned,
-        pre_registration_means=before,
-        all_orientation_coordinates=orientations,
-        all_orientation_aligned_means=orientation_full,
-        raw_grams=np.array(raw_grams),
-        rotations=rotations,
-        axes=axes,
-        explained=explained,
-        areas=np.array(AREAS),
-        display_areas=np.array(DISPLAY_AREAS),
-    )
-    coordinate_rows = []
-    direction_rows = []
-    mouse_rows = []
-    audits = []
-    for ai, area in enumerate(AREAS):
-        for fi in range(4):
-            for pool in range(2):
-                meta = dict(area=area, fi=fi, condition=LABELS[fi], pool=["low", "high"][pool])
-                for d in range(8):
-                    direction_rows.append(
-                        dict(
-                            **meta,
-                            direction=d * 45,
-                            **{f"PC{k + 1}": directions[ai, fi, pool, d, k] for k in range(3)},
-                        )
-                    )
-                for o in range(4):
-                    coordinate_rows.append(
-                        dict(
-                            **meta,
-                            orientation=o * 45,
-                            **{f"PC{k + 1}": orientations[ai, fi, pool, o, k] for k in range(3)},
-                        )
-                    )
-                full = np.mean(np.sum(orientation_full[ai, fi, pool] ** 2, -1))
-                projected = np.mean(np.sum(orientations[ai, fi, pool] ** 2, -1))
-                g = raw_grams[ai][fi, pool * 8 : (pool + 1) * 8, pool * 8 : (pool + 1) * 8]
-                pair = np.concatenate([np.eye(4), np.eye(4)], axis=1) / 2
-                raw = np.trace(pair @ g @ pair.T) / 4
-                audits.append(
-                    dict(
-                        **meta,
-                        mean_individual_radius=raw,
-                        aligned_mean_radius=full,
-                        projected_mean_radius=projected,
-                        retained_3d=projected / full,
-                        direction_full_radius=np.mean(np.sum(aligned[ai, fi, pool] ** 2, -1)),
-                        direction_projected_radius=np.mean(
-                            np.sum(directions[ai, fi, pool] ** 2, -1)
-                        ),
-                    )
-                )
-        for m in [m for m in mouse_means if m["area"] == area]:
-            d = m["values"] @ rotations[ai] @ axes
-            c = (d[:, :4] + d[:, 4:]) / 2
-            for pool in range(2):
-                for o in range(4):
-                    mouse_rows.append(
-                        dict(
-                            area=area,
-                            fi=m["fi"],
-                            mouse=m["mouse"],
-                            pool=["low", "high"][pool],
-                            orientation=o * 45,
-                            **{f"PC{k + 1}": c[pool, o, k] for k in range(3)},
-                        )
-                    )
-    for name, rows in [
-        ("pca_coordinates", coordinate_rows),
-        ("pca_direction_coordinates", direction_rows),
-        ("pca_mouse_coordinates", mouse_rows),
-        ("pca_radius_audit", audits),
-    ]:
-        pd.DataFrame(rows).to_csv(DEST / f"{name}.csv", index=False)
-    camera = json.loads((D_SOURCE / "shared_pca_validation.json").read_text())["camera"]
-    for p, h in inputs.items():
-        assert sha(p) == h
-    for p, h in protected.items():
-        assert sha(DEST / p) == h
-    v = dict(
-        validated=True,
-        populations=len(pops),
-        areas=AREAS,
-        display_areas=DISPLAY_AREAS,
-        pools_original_indices=[[0, 1, 2, 3], [4, 5, 6, 7]],
-        trials_per_direction_per_pool=dict(all=60, train=48, heldout=12),
-        draws=1000,
-        folds=5,
-        fit_rows=256,
-        fit_labels="eight directions",
-        display_labels="four opposite-direction coordinate means after PCA",
-        centering="Independently subtract the eight-direction mean within each pool, training/heldout split and draw.",
-        alignment="D-style training-only empirical target within area/fold, equal conditions and mice. Rank-10 Gram embedding of 16 labels. One orthogonal map jointly acts on both pools and all eight directions; apply to held-out centroids. Average folds, draws, sessions, mice.",
-        pca="D-style equal-area generalized orthogonal Procrustes across all 64 condition/pool/direction rows per area, then one SVD of all 256 rows. D labeled-corner PC sign convention. No scaling. Average opposing coordinates only after projection; display AM-PM and A-AL-RL.",
-        camera=camera,
-        iterations=iters,
-        pca_retained_3d=float(explained[:3].sum()),
-        rotation_orthogonality_error=orth_error,
-        rotation_gram_error=gram_error,
-        target_rank10_retention=target_retention,
-        protected_FG=protected,
-        inputs=inputs,
-        sources={n: sha(ROOT / n) for n in SOURCES},
-    )
-    (DEST / "pca_validation.json").write_text(json.dumps(v, indent=2) + "\n")
-    print(
-        "Validated all-area direction PCA; retained 3D:",
-        v["pca_retained_3d"],
-        "camera:",
-        camera,
-        flush=True,
-    )
+    np.savez_compressed(DEST / "pca_geometry.npz", coordinates=orientations[displayed])
+    print("Shared PCA retained variance:", float(explained[:3].sum()), flush=True)

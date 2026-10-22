@@ -1,29 +1,7 @@
 import pandas as pd
 from analysis_config import OUT
-import xml.etree.ElementTree as ET
 
 DEST = OUT / "manuscript_statistics"
-
-
-def editable_regular_svg(path):
-    """Explicit Illustrator font mapping without outlining or PDF round-trips."""
-    ns = "http://www.w3.org/2000/svg"
-    ET.register_namespace("", ns)
-    ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
-    tree = ET.parse(path)
-    texts = list(tree.getroot().iter("{" + ns + "}text"))
-    assert texts, "Editable SVG must contain text nodes"
-    for text in texts:
-        for node in text.iter():
-            # Keep explicit symbol fallback only for unsupported mathematical arrows.
-            if "".join(node.itertext()).strip() in ["→"]:
-                continue
-            node.set(
-                "style",
-                node.get("style", "")
-                + ";font-family:'MyriadPro-Regular','Myriad Pro';font-weight:400;font-style:normal",
-            )
-    tree.write(path, encoding="utf-8", xml_declaration=True)
 
 
 def main_label(panel):

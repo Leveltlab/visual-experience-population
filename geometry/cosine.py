@@ -1,7 +1,6 @@
-import json
 import numpy as np
 import pandas as pd
-from analysis_config import DATA, OUT, ROOT, AREAS, LABELS, ids_for, manifest, sha
+from analysis_config import DATA, OUT, AREAS, LABELS, ids_for, manifest
 from scipy import stats
 from geometry.statistics import finite_mean, holm, interval, signflip_p, unit_vectors
 
@@ -47,7 +46,7 @@ def pooled_centroids(x, stim):
 def analyze():
     (DEST / "populations").mkdir(parents=True, exist_ok=True)
     populations = manifest()["populations"]
-    data, pair_rows, coverage, comparisons, hashes = {}, [], [], [], {}
+    data, pair_rows, coverage, comparisons = {}, [], [], []
     for p in populations:
         response_path = DATA / "responses" / f"s{p['sid']:03d}.npz"
         with np.load(response_path) as z:
@@ -114,16 +113,11 @@ def analyze():
                 trials_per_direction=30,
             )
         )
-        hashes[str(p["pid"])] = dict(
-            responses=sha(response_path),
-            selections=sha(DATA / "selections" / f"p{p['pid']:03d}.npy"),
-        )
         np.savez_compressed(
             DEST / "populations" / f"p{p['pid']:03d}.npz",
             cosine_matrix=matrix,
             angular_cosine=profile,
             valid=valid,
-            selection_sha256=hashes[str(p["pid"])]["selections"],
         )
     mouse_rows, mouse_pairs = [], []
     for area in AREAS:
@@ -200,43 +194,4 @@ def analyze():
         ("pooling_comparison.csv", pd.DataFrame(comparisons)),
     ]:
         frame.to_csv(DEST / name, index=False)
-    validation = dict(
-        validated=True,
-        populations=len(populations),
-        unique_mice=int(mouse.mouse.nunique()),
-        mouse_area_condition_profiles=len(mouse) // 8,
-        n=10,
-        draws=1000,
-        contrasts_percent=(np.array(manifest()["contrasts"])[-2:] * 100).tolist(),
-        trials_per_contrast_direction=15,
-        pooled_trials_per_direction=30,
-        total_valid_draws=sum(r["valid_draws"] for r in coverage),
-        total_requested_draws=len(populations) * 1000,
-        directions_degrees=ANGLES.tolist(),
-        direction_difference_degrees=ANGLES.tolist(),
-        centering="Subtract the mean of eight pooled direction centroids per neuron.",
-        normalization="Cosine of the complete 10-neuron vectors, separately in each draw.",
-        pooling="Combine raw trials from the two highest contrasts before constructing centroids; never average already normalized contrast-specific cosines.",
-        pairs="Eight ordered pairs at each directed angular difference. The 180-degree bin contains four unique undirected pairs, each twice. The 0-degree bin contains eight self-pairs.",
-        aggregation="Equal pairs within draw, equal valid draws within session-area population, equal sessions within mouse, equal mice within area-condition.",
-        symmetry="C(delta)=C(360-delta) is guaranteed by symmetric cosine and complete pair averaging; it is not evidence of correct neural encoding. A second peak at 180 degrees and minima near 90/270 degrees are orientation-like.",
-        missing="A zero-length centered vector invalidates its whole draw for every bin; no epsilon or zero replacement.",
-        intervals="Pointwise 95% intervals from 5000 whole-mouse bootstrap resamples.",
-        inference="Exploratory paired mouse t tests, opposite minus orthogonal, Holm across 16 area-condition groups. Exact two-sided sign flips with the same family are a sensitivity check; no tests on mirrored bins or the identity diagonal.",
-        limitation="All-trial centered cosine can have noise and shared-centering bias. Self-similarity equals one by construction. Previous independent-fold study remains separately available.",
-        numerical_checks=[
-            "30 raw trials per direction",
-            "direct pooling equals mean of equal-sized centroids",
-            "SciPy cosine spot checks in every population",
-            "full matrix symmetry",
-            "self-pair cosine one",
-            "full-circle reflection symmetry",
-            "bounds [-1,1]",
-        ],
-        source_hashes=hashes,
-        code_sha256=sha(__file__),
-        helper_sha256=sha(ROOT / "geometry/statistics.py"),
-        protocol_sha256=sha(ROOT / "protocol.json"),
-    )
-    (DEST / "validation.json").write_text(json.dumps(validation, indent=2) + "\n")
-    return mouse, groups, tests, validation
+    return mouse, groups

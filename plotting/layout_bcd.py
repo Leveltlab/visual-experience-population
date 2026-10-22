@@ -180,7 +180,6 @@ def render_compact(report, groups, mouse, angular):
         [[-np.sin(a), np.cos(a), 0], [-np.sin(e) * np.cos(a), -np.sin(e) * np.sin(a), np.cos(e)]]
     )
     all_xy = R.SHARED_COORDS @ basis.T
-    layout = []
     for ai, area in enumerate(R.AREAS):
         x = ai * 75
         text(x + 36, 93, area, 6, ha="center")
@@ -279,15 +278,6 @@ def render_compact(report, groups, mouse, angular):
         for row in comparisons("D", area).itertuples():
             fi = 0 if row.timepoint == "baseline" else 2
             vertical_bracket(inset, top * 0.94, 3 - fi, 2 - fi, row.stars, width=top * 0.05)
-        layout.append(
-            dict(
-                area=area,
-                zoom=float(np.max(abs(all_xy)) / extent),
-                retained_3d=float(
-                    np.sum(R.SHARED_COORDS[ai] ** 2) / np.sum(R.SHARED_ALIGNED[ai] ** 2)
-                ),
-            )
-        )
     from plotting.vector_hatching import expand_hatches
 
     assert expand_hatches(fig) == 17  # Sixteen direction bars and their legend key.
@@ -295,5 +285,5 @@ def render_compact(report, groups, mouse, angular):
     texts = [t for t in fig.findobj(Text) if t.get_visible() and t.get_text()]
     assert min(t.get_fontsize() for t in texts) >= 4
     assert all(t.get_fontweight() in ("normal", 400) for t in texts)
-    assert all(t.get_fontfamily() == ["Myriad Pro"] for t in texts)
+    assert all(t.get_fontfamily() == plt.rcParams["font.family"] for t in texts)
     return fig

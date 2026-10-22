@@ -1,119 +1,125 @@
-"""Prepare raw deconvolved activity, the requested averaging window and N10 subsets."""
+"""Prepare raw MATLAB recordings for all figure analyses, one session at a time."""
 
+import argparse
 import json
-import numpy as np
-from analysis_config import ROOT, DATA, OUT, AREAS, N, SIGNAL, protocol, sha
-from preprocess.folds import make_folds
-import os
 from pathlib import Path
+import shutil
+import tempfile
+import numpy as np
+from analysis_config import DATA, AREAS, SIGNAL, protocol
+from preprocess.matlab2py import discover_sessions, load_session
+from preprocess.folds import make_folds
 
-RAW = Path(os.environ.get("VEP_PYDATA_DIR", ROOT / "preprocess/pydata")) / "pooled"
 REGIONS = {"V1": [6], "AM-PM": [0, 1], "A-AL-RL": [2, 3, 4], "LM": [5]}
 
 
-def raw_trials(signal, time):
-    """Retain finite neurons without centering or scaling any trial."""
-    good = np.isfinite(signal).all(axis=(0, 1))
-    baseline = (time >= -1) & (time < 0)
-    mu = signal[baseline].mean(0, dtype=np.float64)
-    sd = signal[baseline].std(0, dtype=np.float64, ddof=0)
-    return signal, good, mu, sd
+def prepare(input_dir, output_dir=DATA, signal=SIGNAL, overwrite=False):
+    """Discover recordings and save responses, native temporal frames, folds and draws."""
+    sessions = discover_sessions(input_dir)
+    destination = Path(output_dir).resolve()
+    if destination.exists() and not overwrite:
+        raise FileExistsError(f"{destination} already exists; use --overwrite to rebuild it")
+    raw_root = Path(input_dir).resolve()
+    if (
+        destination == raw_root
+        or destination in raw_root.parents
+        or raw_root in destination.parents
+    ):
+        raise ValueError("Prepared output must be separate from the raw recording tree")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".prepare-", dir=destination.parent))
+    spec = protocol()
+    sources = []
+    populations = []
+    common_time = None
+    contrasts = None
+    try:
+        for name in ["responses", "temporal", "selections", "decoding_folds"]:
+            (staging / name).mkdir()
+        for sid, session in enumerate(sessions):
+            raw, time, stim, regions = load_session(session, signal)
+            folds = make_folds(stim, sid)
+            if common_time is None:
+                common_time = time
+                contrasts = np.unique(stim[:, 1])
+            elif not np.array_equal(time, common_time) or not np.array_equal(
+                np.unique(stim[:, 1]), contrasts
+            ):
+                raise ValueError(
+                    f"{session.relative_path}: time grid and contrast levels must match across sessions"
+                )
+            window = (time >= spec["averaged_window"][0]) & (time < spec["averaged_window"][1])
+            temporal = (time >= spec["temporal_window"][0]) & (time <= spec["temporal_window"][1])
+            if not window.any() or not temporal.any():
+                raise ValueError(f"{session.relative_path}: no samples in the analysis window")
+            values = raw.astype(np.float64)
+            good = np.isfinite(values).all(axis=(0, 1))
+            np.savez_compressed(
+                staging / "responses" / f"s{sid:03d}.npz",
+                X=values[window].mean(0),
+                stim=stim,
+                folds=folds,
+            )
+            np.save(staging / "temporal" / f"s{sid:03d}.npy", raw[temporal])
+            np.save(staging / "decoding_folds" / f"s{sid:03d}.npy", folds)
+            source = dict(
+                sid=sid,
+                fi=session.fi,
+                group=session.group,
+                timepoint=session.timepoint,
+                mouse=session.mouse,
+                file=session.relative_path,
+            )
+            sources.append(source)
+            for ai, area in enumerate(AREAS):
+                eligible = np.flatnonzero(good & np.isin(regions, REGIONS[area]))
+                if len(eligible) < spec["n"]:
+                    continue
+                pid = len(populations)
+                populations.append(
+                    dict(**source, pid=pid, area=area, n=spec["n"], eligible=len(eligible))
+                )
+                rng = np.random.default_rng([spec["selection_seed"], sid, ai, spec["n"]])
+                ids = np.array(
+                    [rng.choice(eligible, spec["n"], replace=False) for _ in range(spec["draws"])]
+                )
+                np.save(staging / "selections" / f"p{pid:03d}.npy", ids)
+            print(f"{signal} session {sid}: {session.relative_path}", flush=True)
+        if not populations:
+            raise ValueError("No session–area has ten finite, atlas-assigned neurons")
+        np.save(staging / "temporal/time.npy", common_time[temporal])
+        (staging / "manifest.json").write_text(
+            json.dumps(
+                dict(
+                    signal=signal,
+                    sources=sources,
+                    populations=populations,
+                    contrasts=contrasts.tolist(),
+                    draws=spec["draws"],
+                ),
+                indent=2,
+            )
+            + "\n"
+        )
+        if destination.exists():
+            shutil.rmtree(destination)
+        staging.replace(destination)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+    print(f"Prepared {len(sources)} sessions and {len(populations)} populations in {destination}")
+    return dict(sessions=len(sources), populations=len(populations))
 
 
 def main():
-    for folder in [DATA / "responses", DATA / "temporal", DATA / "selections", OUT]:
-        folder.mkdir(parents=True, exist_ok=True)
-    old = json.loads((ROOT / "preprocess/registry.json").read_text())
-    sources = []
-    pops = []
-    audit = []
-    hashes = {}
-    cached = {}
-    for s in old["sources"]:
-        key = f"{s['group']}_{s['timepoint']}"
-        if key not in cached:
-            path = RAW / f"{SIGNAL}_{key}.npy"
-            meta = json.loads((RAW / f"metadata_{key}.json").read_text())
-            cached[key] = (np.load(path, mmap_mode="r"), meta)
-            hashes[str(path)] = sha(path)
-        raw, meta = cached[key]
-        sess = next(v for v in meta["sessions"] if v["session_key"] == s["session"])
-        assert sess["source_file"] == s["source"] and sess["neuron_start"] == s["global_start"]
-        start, stop = sess["neuron_start"], sess["neuron_stop"]
-        time = np.array(meta["numeric"]["time"])
-        frames = (time >= -0.5) & (time <= 1.5)
-        window = (time >= protocol()["averaged_window"][0]) & (
-            time < protocol()["averaged_window"][1]
-        )
-        stim = np.array(meta["numeric"]["stim"])[sess["behavior_index"]]
-        folds = make_folds(stim, s["sid"])
-        signal = np.asarray(raw[:, :, start:stop], dtype=np.float64)
-        z, good, mu, sd = raw_trials(signal, time)
-        regions = np.array(meta["numeric"]["region"])[start:stop]
-        neurons = {a: np.flatnonzero(good & np.isin(regions, REGIONS[a])).tolist() for a in AREAS}
-        neurons["ALL"] = sorted(sum(neurons.values(), []))
-        source = {k: v for k, v in s.items() if k != "neurons"}
-        source["neurons"] = neurons
-        sources.append(source)
-        X = z[window].mean(0)
-        np.savez_compressed(
-            DATA / "responses" / f"s{s['sid']:03d}.npz",
-            X=X,
-            stim=stim,
-            folds=folds,
-            baseline_mean=mu,
-            baseline_sd=sd,
-            eligible=good,
-        )
-        np.save(DATA / "temporal" / f"s{s['sid']:03d}.npy", z[frames].astype("float32"))
-        np.save(DATA / "temporal/time.npy", time[frames])
-        for ai, area in enumerate(AREAS):
-            eligible = neurons[area]
-            if len(eligible) < N:
-                continue
-            pid = len(pops)
-            p = {k: v for k, v in source.items() if k not in ["neurons", "global_start", "source"]}
-            p.update(pid=pid, n=N, mode="session", area=area, eligible=len(eligible))
-            pops.append(p)
-            rng = np.random.default_rng([protocol()["selection_seed"], s["sid"], ai, N])
-            selected = np.array([rng.choice(eligible, N, replace=False) for _ in range(1000)])
-            np.save(DATA / "selections" / f"p{pid:03d}.npy", selected)
-        audit.append(
-            dict(
-                sid=s["sid"],
-                neurons=stop - start,
-                eligible=int(good.sum()),
-                excluded=int((~good).sum()),
-                zero_baseline_trial_neurons=int((sd == 0).sum()),
-                raw_response_reconstruction_error=float(abs(X - signal[window].mean(0)).max()),
-                baseline_min_sd=float(sd[:, good].min()),
-                response_max_abs=float(abs(X[:, good]).max()),
-            )
-        )
-        print(f"{SIGNAL} s{s['sid']:03d}: {good.sum()}/{len(good)} valid neurons", flush=True)
-    result = dict(
-        populations=pops,
-        sources=sources,
-        contrasts=old["contrasts"],
-        draws=1000,
-        smoke=False,
-        input_hashes=hashes,
-    )
-    (DATA / "manifest.json").write_text(json.dumps(result, indent=2))
-    (OUT / "input_audit.json").write_text(
-        json.dumps(
-            dict(
-                protocol=protocol(),
-                sessions=audit,
-                populations=len(pops),
-                baseline_frames=time[(time >= -1) & (time < 0)].tolist(),
-                response_frames=time[window].tolist(),
-                temporal_frames=time[frames].tolist(),
-            ),
-            indent=2,
-        )
-    )
-    print("Prepared", len(pops), "N10 populations", flush=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--signal", choices=["spikes", "calcium"], default=SIGNAL)
+    parser.add_argument("--overwrite", action="store_true")
+    args = parser.parse_args()
+    output = args.output or (DATA if args.signal == SIGNAL else DATA.parent / args.signal)
+    prepare(args.input, output, args.signal, args.overwrite)
 
 
 if __name__ == "__main__":

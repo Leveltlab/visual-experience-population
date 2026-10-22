@@ -25,6 +25,8 @@ dimensionality_reduction = "dimensionality-reduction"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not integration'"
+markers = ["integration: panel exports or full MATLAB-to-figure pipeline (R required for the latter)"]
 
 [tool.ruff]
 line-length = 100

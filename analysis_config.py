@@ -1,4 +1,4 @@
-"""Final raw deconvolved protocol; all subsets and folds shared within this analysis."""
+"""Common paths, experimental conditions and mouse-level aggregation."""
 
 from pathlib import Path
 import hashlib, json
@@ -26,7 +26,7 @@ def sha(path):
     return h.hexdigest()
 
 
-def protocol(require_final=True):
+def protocol():
     spec = json.loads((ROOT / "protocol.json").read_text())
     spec["signal"] = SIGNAL
     spec["signal_description"] = (

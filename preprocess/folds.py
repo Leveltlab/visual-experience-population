@@ -1,52 +1,28 @@
-"""Five fixed, shuffled folds stratified by direction × contrast within session."""
+"""Five seeded folds stratified by all eight directions and eight contrasts."""
 
-import json
 import numpy as np
-from analysis_config import DATA, manifest, protocol, sha
+from analysis_config import DATA, protocol
 
 
 def make_folds(stim, sid):
+    if (
+        stim.shape != (960, 2)
+        or not np.array_equal(np.unique(stim[:, 0]), np.arange(8) * 45)
+        or len(np.unique(stim[:, 1])) != 8
+    ):
+        raise ValueError(
+            "Expected 960 trials: eight directions (0,45,...,315°), eight contrasts, 15 repeats per cell"
+        )
     _, cells = np.unique(stim, axis=0, return_inverse=True)
+    if not np.array_equal(np.bincount(cells), np.full(64, 15)):
+        raise ValueError("Every direction × contrast cell must have exactly 15 trials")
     folds = np.full(len(stim), -1, dtype=np.int8)
     for cell in range(64):
         trials = np.flatnonzero(cells == cell)
-        assert len(trials) == 15
         rng = np.random.default_rng([protocol()["decoding_fold_seed"], int(sid), cell])
         folds[rng.permutation(trials)] = np.repeat(np.arange(5), 3)
-    assert np.all(folds >= 0)
     return folds
 
 
 def load_folds(sid):
     return np.load(DATA / "decoding_folds" / f"s{sid:03d}.npy")
-
-
-def main():
-    dest = DATA / "decoding_folds"
-    dest.mkdir(exist_ok=True)
-    hashes = {}
-    for source in manifest()["sources"]:
-        sid = source["sid"]
-        with np.load(DATA / "responses" / f"s{sid:03d}.npz") as z:
-            folds = make_folds(z["stim"], sid)
-        path = dest / f"s{sid:03d}.npy"
-        np.save(path, folds)
-        hashes[path.name] = sha(path)
-    (dest / "manifest.json").write_text(
-        json.dumps(
-            dict(
-                folds=5,
-                train_fraction=0.8,
-                test_fraction=0.2,
-                seed=protocol()["decoding_fold_seed"],
-                trials_per_direction_contrast=dict(train=12, test=3),
-                hashes=hashes,
-            ),
-            indent=2,
-        )
-    )
-    print(f"Prepared five decoding folds for {len(hashes)} sessions; geometry folds unchanged")
-
-
-if __name__ == "__main__":
-    main()

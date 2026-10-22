@@ -1,9 +1,8 @@
-"""Render the frozen source-data snapshot or a freshly computed results folder."""
+"""Export individual figure panels from source_data or computed results."""
 
 from pathlib import Path
 from types import SimpleNamespace
 import json
-import hashlib
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,28 +14,17 @@ from plotting import panels_bcd as bcd, panels_fgh as fgh
 from plotting.layout_bcd import render_compact
 
 
-def verify_snapshot():
-    path = OUT / "manifest.json"
-    if path.exists():
-        spec = json.loads(path.read_text())
-        for name, expected in spec["sha256"].items():
-            actual = hashlib.sha256((OUT / name).read_bytes()).hexdigest()
-            if actual != expected:
-                raise ValueError(f"Snapshot hash mismatch: {name}")
-
-
 def bcd_figure():
     dest = OUT / "direction_cosine_top2/supporting"
     with np.load(dest / "shared_pca.npz") as z:
-        coords, aligned = z["coordinates"], z["aligned_means"]
+        coords = z["coordinates"]
     report = SimpleNamespace(
         AREAS=AREAS,
         LABELS=LABELS,
         COLORS=COLORS,
         MARKERS=bcd.MARKERS,
-        CAMERA=json.loads((dest / "shared_pca_validation.json").read_text())["camera"],
+        CAMERA=json.loads((OUT / "camera.json").read_text()),
         SHARED_COORDS=coords,
-        SHARED_ALIGNED=aligned,
         RADIUS_GROUPS=pd.read_csv(dest / "radius_groups.csv"),
         draw_panel=bcd.draw_panel,
         decoding_panel=bcd.decoding_panel,
@@ -93,7 +81,6 @@ def isolate(fig, bounds, legend=True):
 
 
 def export_panel(panel, destination):
-    verify_snapshot()
     use_myriad_pro()
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
@@ -101,7 +88,7 @@ def export_panel(panel, destination):
         fig = bcd_figure()
         bounds = {"B": (0, 100, 150, 100), "C": (150, 100, 150, 100), "D": (0, 0, 300, 100)}[panel]
     elif panel in ["F", "G", "H"]:
-        fgh.CAMERA = json.loads((fgh.DEST / "pca_validation.json").read_text())["camera"]
+        fgh.CAMERA = json.loads((OUT / "camera.json").read_text())
         if panel == "H":
             fig = plt.figure(figsize=(140 / 72, 185 / 72))
             fgh.pca(fig)

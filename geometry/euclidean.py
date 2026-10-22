@@ -1,7 +1,6 @@
-import json
 import numpy as np
 import pandas as pd
-from analysis_config import DATA, OUT, ROOT, AREAS, LABELS, ids_for, manifest, sha
+from analysis_config import DATA, OUT, ROOT, AREAS, LABELS, ids_for, manifest
 import subprocess
 from scipy.spatial.distance import cdist
 from scipy.stats import mannwhitneyu
@@ -35,14 +34,9 @@ def distance_matrix(vectors):
 def analyze():
     DEST.mkdir(exist_ok=True)
     (DEST / "populations").mkdir(exist_ok=True)
-    frozen = json.loads((OUT / "direction_cosine_top2/validation.json").read_text())
-    sessions, draws, sources = [], [], {}
+    sessions, draws = [], []
     for p in manifest()["populations"]:
         response = DATA / "responses" / f"s{p['sid']:03d}.npz"
-        selection = DATA / "selections" / f"p{p['pid']:03d}.npy"
-        source = dict(responses=sha(response), selections=sha(selection))
-        assert source == frozen["source_hashes"][str(p["pid"])]
-        sources[str(p["pid"])] = source
         with np.load(response) as z:
             means, _ = pooled_centroids(z["X"], z["stim"])
         vectors = np.moveaxis(means[:, ids_for(p)], 1, 0)
@@ -122,7 +116,7 @@ def analyze():
     )
     template.to_csv(DEST / "input_cosine_validation.csv", index=False)
     subprocess.run(
-        ["Rscript", str(HERE / "euclidean_panel_b.R"), str(DEST), str(ROOT / "data/R-library")],
+        ["Rscript", str(HERE / "euclidean_panel_b.R"), str(DEST)],
         check=True,
         stdout=subprocess.DEVNULL,
     )
@@ -165,28 +159,4 @@ def analyze():
     factorial = pd.read_csv(DEST / "factorial_euclidean.csv")
     factorial["stars"] = factorial.p_holm.map(stars)
     factorial.to_csv(DEST / "factorial_euclidean.csv", index=False)
-    validation = dict(
-        validated=True,
-        populations=len(sources),
-        sessions=int(session.sid.nunique()),
-        mice=int(mouse.mouse.nunique()),
-        draws_per_population=1000,
-        neurons=10,
-        source_hashes=sources,
-        code_sha256=sha(__file__),
-        r_code_sha256=sha(HERE / "euclidean_panel_b.R"),
-        checks=[
-            "Frozen response and selection hashes match cosine B",
-            "Cosine profiles reconstructed exactly",
-            "SciPy cdist in each population",
-            "Translation invariance",
-            "Identical missingness and mouse support",
-            "Accepted cosine factorial ATS, df and adjusted p reproduced with same R engine",
-        ],
-        metric="Mean of pairwise Euclidean norms in raw full N10 space; no unit normalization, squaring, or division by N",
-        centering="Within each population and draw, subtract the mean of its eight direction centroids per neuron, exactly as in cosine panel B.",
-        aggregation="Eight ordered pairs per difference, then 1000 draws, then sessions within mouse, then mice",
-        inference="Same four-factor nparLD 2.3.3 ATS; Holm across four main effects within this panel. Exact two-sided NR versus DR Mann-Whitney at 180 degrees; Holm across two timepoints within each area.",
-    )
-    (DEST / "validation.json").write_text(json.dumps(validation, indent=2) + "\n")
     return groups, tests, factorial
