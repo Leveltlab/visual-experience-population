@@ -14,6 +14,35 @@ from plotting import panels_bcd as bcd, panels_fgh as fgh
 from plotting.layout_bcd import render_compact
 
 
+ORIENTATION_PANELS = [
+    "B_angular_distance",
+    "orientation_contrasts",
+    "B_cosine_endpoints",
+    "B_cosine_contrast",
+    "B_euclidean_endpoints",
+    "B_euclidean_contrast",
+]
+COMPACT_PANELS = [
+    "cosine_contrast",
+    "euclidean_contrast",
+    "radius_bars",
+    *["radius_" + area.replace("-", "_") for area in AREAS],
+]
+PANELS = [
+    "B",
+    "C",
+    "D",
+    "F",
+    "G",
+    "H",
+    "B_angular",
+    "B_euclidean",
+    "B_cross_contrast",
+    *ORIENTATION_PANELS,
+    *COMPACT_PANELS,
+]
+
+
 def bcd_figure():
     dest = OUT / "direction_cosine_top2/supporting"
     with np.load(dest / "shared_pca.npz") as z:
@@ -81,7 +110,25 @@ def isolate(fig, bounds, legend=True):
 
 
 def export_panel(panel, destination):
+    with plt.rc_context():
+        return _export_panel(panel, destination)
+
+
+def _export_panel(panel, destination):
     use_myriad_pro()
+    if panel not in ORIENTATION_PANELS + COMPACT_PANELS:
+        # Explicit compact-panel defaults keep legacy supplements independent of export order.
+        plt.rcParams.update(
+            {
+                "axes.titleweight": "normal",
+                "axes.labelweight": "normal",
+                "axes.titlesize": 6,
+                "axes.labelsize": 5,
+                "xtick.labelsize": 4,
+                "ytick.labelsize": 4,
+                "axes.linewidth": 0.45,
+            }
+        )
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
     if panel in ["B", "C", "D"]:
@@ -126,9 +173,21 @@ def export_panel(panel, destination):
             )
         fig.tight_layout()
         bounds = (0, 0, 504, 144)
+    elif panel in ORIENTATION_PANELS:
+        from plotting.orientation_contrasts import render
+
+        fig, tight = render(panel)
+    elif panel in COMPACT_PANELS:
+        from plotting.compact_contrasts import render
+
+        fig = render(panel)
+        tight = False
     else:
         raise ValueError(f"Unknown panel: {panel}")
-    box = isolate(fig, bounds)
+    if panel in ORIENTATION_PANELS + COMPACT_PANELS:
+        box = "tight" if tight else None
+    else:
+        box = isolate(fig, bounds)
     paths = []
     for ext in ["png", "svg", "pdf"]:
         fig.canvas.draw()
@@ -142,7 +201,4 @@ def export_panel(panel, destination):
 
 
 def export_all(destination):
-    return {
-        panel: export_panel(panel, destination)
-        for panel in ["B", "C", "D", "F", "G", "H", "B_angular", "B_euclidean", "B_cross_contrast"]
-    }
+    return {panel: export_panel(panel, destination) for panel in PANELS}

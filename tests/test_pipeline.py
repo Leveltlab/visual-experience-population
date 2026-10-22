@@ -6,6 +6,7 @@ import subprocess
 import sys
 import pytest
 from tests.test_preprocess import write_recording
+from plotting.export import PANELS
 from preprocess.matlab2py import CONDITIONS
 
 
@@ -31,4 +32,4 @@ def test_raw_recordings_through_all_panels(tmp_path):
         check=True,
         timeout=900,
     )
-    assert len(list((tmp_path / "results/panels").glob("*.png"))) == 9
+    assert len(list((tmp_path / "results/panels").glob("*.png"))) == len(PANELS)

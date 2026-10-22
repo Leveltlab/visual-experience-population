@@ -12,7 +12,11 @@ STAGES = {
     "decoding": [("decoding.run", "run")],
     "pca": [("dimensionality_reduction.run", "run")],
     "statistics": [("geometry.inference", "run")],
-    "supplement": [("geometry.euclidean", "analyze"), ("geometry.cross_contrast", "analyze")],
+    "supplement": [
+        ("geometry.euclidean", "analyze"),
+        ("geometry.cross_contrast", "analyze"),
+        ("geometry.orientation_contrasts", "analyze"),
+    ],
 }
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

@@ -1,4 +1,4 @@
-"""Export all nine panels without opening Jupyter."""
+"""Export all main and supplementary panels without opening Jupyter."""
 
 import argparse
 import os

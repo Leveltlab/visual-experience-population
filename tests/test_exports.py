@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PANELS = ["B", "C", "D", "F", "G", "H", "B_angular", "B_euclidean", "B_cross_contrast"]
+from plotting.export import PANELS, COMPACT_PANELS
 
 
 @pytest.mark.integration
@@ -38,13 +38,19 @@ assert seen==expected, f'Unused inputs: {expected-seen}; unexpected inputs: {see
     subprocess.run(
         [sys.executable, "-c", script, str(data), str(out)], cwd=ROOT, env=env, check=True
     )
-    assert len(list(out.iterdir())) == 36
+    assert len(list(out.iterdir())) == 4 * len(PANELS)
     for panel in PANELS:
         for ext in ["png", "pdf", "svg"]:
             assert (out / f"panel_{panel}.{ext}").stat().st_size > 100
         for suffix in [".svg", "_outlined.svg"]:
             tree = ET.parse(out / f"panel_{panel}{suffix}")
             assert not tree.findall(".//{http://www.w3.org/2000/svg}image")
+            if panel in COMPACT_PANELS:
+                expected_width = (
+                    "55pt" if panel.startswith("radius_") and panel != "radius_bars" else "150pt"
+                )
+                assert tree.getroot().attrib["width"] == expected_width
+                assert tree.getroot().attrib["height"] == "100pt"
             if "outlined" in suffix:
                 assert not tree.findall(".//{http://www.w3.org/2000/svg}text")
 

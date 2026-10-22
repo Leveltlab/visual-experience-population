@@ -25,9 +25,9 @@ uv sync --locked
 uv run jupyter lab plotting/figures.ipynb
 ```
 
-Run the notebook to export **B, C, D, F, G and H**, plus three B supplements: the full angular cosine profile, Euclidean distance and cross-contrast cosine. Each panel is saved independently as **PNG, PDF, editable SVG and outlined SVG** in `plotting/exports/`.
+Run the notebook to export **B, C, D, F, G and H**, plus the B supplements and D-radius barplots listed below. Each panel is saved independently as **PNG, PDF, editable SVG and outlined SVG** in `plotting/exports/`.
 
-The included [`plotting/source_data/`](plotting/source_data/) contains only the 15 numerical inputs needed to draw these panels. No recordings or R installation are needed to reproduce the figures. For a noninteractive export:
+The included [`plotting/source_data/`](plotting/source_data/) contains only the 19 numerical inputs needed to draw these panels. No recordings or R installation are needed to reproduce the figures. For a noninteractive export:
 
 ```sh
 uv run python -m plotting
@@ -87,6 +87,27 @@ Preparation refuses to replace existing data unless `--overwrite` is supplied. L
 - Within-area alignment uses training centroids and rotates held-out centroids without scaling. Subsequent cross-area registration and PCA use group means and are descriptive. Ordinary cosine, distance and radius retain finite-trial noise; F also includes peak-selection bias.
 
 Factorial inference uses nparLD 2.3.3 with rearing × area × time × panel-specific factor, incomplete records retained, and Holm correction across four main effects within each panel. C uses chance-normalized accuracy; F uses log radius. Two-sided exact NR–DR rank-sum tests use 180° similarity (B), orientation accuracy (C), full-space radius (D), log(high/low) peak radius (F), and transfer accuracy (G). Holm families contain two timepoints per area/endpoint for B–F and six timepoint × transition comparisons per area for G. The included figures cover 116 session–area populations from 72 contributing sessions and 27 mice; small groups limit inference.
+
+### Supplementary panels
+
+The notebook exports each supplement separately:
+
+| Export name | Content |
+| --- | --- |
+| `B_angular`, `B_euclidean`, `B_cross_contrast` | Angular cosine, endpoint Euclidean distance, and cross-contrast cosine |
+| `B_angular_distance` | Full-angle Euclidean distance, including individual mouse values |
+| `orientation_contrasts` | Cosine and distance contrasts across areas |
+| `cosine_contrast`, `euclidean_contrast` | Compact 150 × 100 pt contrast panels |
+| `B_cosine_endpoints`, `B_euclidean_endpoints` | B curves with NR–DR tests at 180° and 90° |
+| `B_cosine_contrast`, `B_euclidean_contrast` | B curves annotated with tests of the within-mouse contrast |
+| `radius_bars` | D's full-space squared radius across areas, on a shared scale (150 × 100 pt) |
+| `radius_V1`, `radius_AM_PM`, `radius_A_AL_RL`, `radius_LM` | Individual D-radius barplots with area-specific scales (55 × 100 pt) |
+
+Orientation contrasts subtract angles **within each mouse and timepoint**: C(180°) − C(90°) for cosine, d(90°) − d(180°) for distance. Pointwise 95% intervals bootstrap these mouse differences, preserving their covariance. Baseline and chronic retain every eligible mouse independently; longitudinal pairing is not required.
+
+These exploratory follow-ups use two-sided exact NR–DR rank-sum tests, with Holm correction over two timepoints separately for each area, metric and endpoint. The numerical table also reports the stricter six-test endpoint × timepoint correction (`p_holm6_sensitivity`); plotted stars use the two-test family. No correction spans areas or metrics. Tests concern distributions of mouse values, not specifically their means. The alternative annotations do not change the main B panel's tests.
+
+Angular distances use the same pooled centroids and all 1,000 ten-neuron draws, taking distances before averaging pairs, draws, sessions within mouse, and mice. Zero self-distance is omitted from the plot; mirrored angles are identical and are not tested separately. Euclidean differences retain response scale and finite-trial noise. D-radius bars use the eight-direction squared radius in full ten-neuron space, displayed ×1,000, with the existing D tests and intervals.
 
 ## Organization
 
