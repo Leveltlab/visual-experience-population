@@ -1,0 +1,45 @@
+{
+  "signal": "spikes",
+  "decoder": [
+    "LDA"
+  ],
+  "n": 10,
+  "draws": 1000,
+  "averaged_window": [
+    0,
+    0.5
+  ],
+  "baseline_window": null,
+  "temporal_window": [
+    -0.5,
+    1.5
+  ],
+  "standardization": "None: raw deconvolved activity; no baseline subtraction, division, or additional feature scaling",
+  "eligibility": "At least 10 atlas-assigned neurons with finite required frames; no baseline variance exclusion",
+  "lda": "Ledoit-Wolf analytic shrinkage of pooled training within-class residual covariance toward trace(S)/N times identity; estimated independently per neuron subset, training context, fold and frame; class-frequency priors; no feature scaling; numerical pseudoinverse for zero covariance",
+  "inference": "Equal mouse weighting after session averaging; 5000 shared mouse-bootstrap weights",
+  "embedding": "Training-only within-area alignment; descriptive cross-area registration and group-mean PCA",
+  "selection_seed": 20261018,
+  "geometry_folds": 5,
+  "decoding_folds": 5,
+  "decoding_fold_seed": 2026101805,
+  "decoding_train_fraction": 0.8,
+  "decoding_test_fraction": 0.2,
+  "signal_description": "Raw deconvolved calcium activity",
+  "baseline_audit_window": [
+    -1,
+    0
+  ],
+  "prediction_ties": "Smallest class index within 1e-10 * max(1, max absolute score) of the maximum score",
+  "analysis_revision": "2026-10-20 N10 Ledoit-Wolf LDA primary; empirical LDA and SVM preserved as controls",
+  "lda_shrinkage": {
+    "estimator": "Ledoit-Wolf",
+    "residuals": "Training trials minus their training class mean, pooled across classes",
+    "target": "trace(empirical within-class covariance) / N * identity",
+    "scope": "Separate per neuron subset, training fold, task/context and training frame",
+    "reference": "sklearn.covariance.ledoit_wolf(residual, assume_centered=True)",
+    "ml_denominator": true,
+    "held_out_data_used": false,
+    "sklearn_lda_auto": false
+  }
+}

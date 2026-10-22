@@ -1,0 +1,30 @@
+[project]
+name = "visual-experience-population"
+version = "0.1.0"
+description = "Population geometry and LDA analyses for visual experience figures B-D and F-H"
+requires-python = ">=3.12,<3.14"
+dependencies = ["numpy>=2,<3", "scipy>=1.14,<2", "pandas>=2.2,<3", "matplotlib>=3.10,<4", "jax>=0.4.36,<0.12", "scikit-learn>=1.5,<2", "h5py>=3.12,<4"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.13"]
+notebook = ["jupyterlab>=4", "nbclient>=0.10", "ipykernel>=6", "nbformat>=5"]
+
+[tool.uv]
+default-groups = ["dev", "notebook"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["preprocess", "geometry", "decoding", "dimensionality_reduction", "plotting"]
+py-modules = ["analysis_config"]
+
+[tool.setuptools.package-dir]
+dimensionality_reduction = "dimensionality-reduction"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

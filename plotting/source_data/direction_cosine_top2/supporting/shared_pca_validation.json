@@ -1,0 +1,23 @@
+{
+  "validated": true,
+  "source": "8d9fd0464f46f73706f473241d719e3f35200f3a9741fd63aa172008516e42ac",
+  "inputs": {
+    "V1": "1a8b471dce59882c4d105170b813f955ec0c2456b02f04f1c54675598e03ce74",
+    "AM-PM": "472fa2ae9cc4b0308dadc76daf2a41c2773a34e994a73f9478025984404f1cfa",
+    "A-AL-RL": "58e702f67ee527c44a7060dc750df85c8083d881ee9b35aaa3f1f799449c0ad1",
+    "LM": "fc5b21da5fbdd4e52a7e3120ef116ba7c650e5a4ebd20e3c789ecf9f651c0077"
+  },
+  "iterations": 89,
+  "gram_max_error": 9.71445146547012e-17,
+  "common_pca_retained_2d": 0.8684145310400331,
+  "common_pca_retained_3d": 0.9948612610157856,
+  "camera": {
+    "elevation": 45,
+    "azimuth": 115,
+    "minimum_standardized_corner_separation": 1.0466521164561928
+  },
+  "registration": "One orthogonal map per area applied jointly to all 32 condition-direction centroids. Iterative target is an equal-area mean. No scale fitting or relabeling. All within-area pair distances, including between conditions, are preserved before projection.",
+  "pca": "One SVD across all 128 registered centroids, with equal rows/areas/conditions and no variance normalization. These are shared descriptive axes, not anatomically matched neuron axes.",
+  "display": "Common axes and orthographic camera in all panels. Fill-panel views use area-specific zoom stated in each panel; equal-scale companion uses identical limits and zoom.",
+  "caution": "Registration fitted to condition means is descriptive. Alignment and averaging can hide individual shape differences; identical axes do not provide an independent statistical test of conserved shape."
+}
