@@ -6,17 +6,20 @@ Population geometry, linear decoding and shared PCA views of visual cortical res
 
 ## Population geometry
 
-**D · Direction geometry in a shared PCA frame**
+<table>
+<tr>
+<td width="52%" valign="top"><img src="plotting/previews/panel_D.png" alt="D: population orientation representation across four visual areas, in a 2×2 layout"></td>
+<td width="48%" valign="top"><img src="plotting/previews/panel_H.png" alt="H: contrast-dependent population spread in medial and lateral dorsal streams"></td>
+</tr>
+<tr>
+<td valign="top"><strong>D.</strong> Dark rearing collapses population orientation representation in dorsal stream higher visual areas. Lateral dorsal stream recovers with visual experience, while medial dorsal stream does not.</td>
+<td valign="top"><strong>H.</strong> Stimulus contrast controls spread of population orientation representation. Medial dorsal stream fails to recover this mechanism with visual experience while lateral dorsal stream succeeds.</td>
+</tr>
+</table>
 
-![Panel D: aligned direction centroids across four visual areas](plotting/previews/panel_D.png)
+NR / DR (normally / dark-reared), baseline / chronic (P90 / P120 = P90+30 days of visual experience). V1: Primary visual cortex; AM-PM: Medial dorsal stream; A-AL-RL: Lateral dorsal stream; LM: Ventral stream.
 
-Eight directions remain distinct through alignment and PCA. Filled and dashed-outline markers identify opposite directions. Each area's scale bar records its display magnification; the insets show radius in the full ten-neuron space.
-
-**H · Contrast-dependent geometry**
-
-<img src="plotting/previews/panel_H.png" alt="Panel H: low-to-high contrast expansion in AM–PM and A–AL–RL" width="460">
-
-Low- and high-contrast centroids share one camera, coordinate system and scale. Arrows connect corresponding orientation centers. Both PCA views are descriptive summaries of aligned group means.
+The README layouts and their [rendering script](plotting/previews/render.py) are in `plotting/previews/`; regenerate them with `uv run python -m plotting.previews.render`.
 
 ## Reproduce the figures
 
