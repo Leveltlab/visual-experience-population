@@ -2,7 +2,9 @@
 
 Population geometry, linear decoding and shared PCA views of visual cortical responses.
 
-[Preprint · bioRxiv](https://doi.org/10.1101/2024.08.31.610645) · [Figure notebook](plotting/figures.ipynb) · [Analysis protocol](protocol.json)
+[![bioRxiv](https://img.shields.io/badge/bioRxiv-Preprint-B31B1B?style=flat-square)](https://doi.org/10.1101/2024.08.31.610645)
+
+ · [Figure notebook](plotting/figures.ipynb) · [Analysis protocol](protocol.json) · 
 
 ## Population geometry
 
@@ -13,13 +15,11 @@ Population geometry, linear decoding and shared PCA views of visual cortical res
 </tr>
 <tr>
 <td valign="top"><strong>D.</strong> Dark rearing collapses population orientation representation in dorsal stream higher visual areas. Lateral dorsal stream recovers with visual experience, while medial dorsal stream does not.</td>
-<td valign="top"><strong>H.</strong> Stimulus contrast controls spread of population orientation representation. Medial dorsal stream fails to recover this mechanism with visual experience while lateral dorsal stream succeeds.</td>
+<td valign="top"><strong>H.</strong> Stimulus contrast controls spread of population orientation representation. Medial dorsal stream fails to recover this dark-rearing-impaired mechanism with visual experience while lateral dorsal stream recovers.</td>
 </tr>
 </table>
 
 NR / DR (normally / dark-reared), baseline / chronic (P90 / P120 = P90+30 days of visual experience). V1: Primary visual cortex; AM-PM: Medial dorsal stream; A-AL-RL: Lateral dorsal stream; LM: Ventral stream.
-
-The README layouts and their [rendering script](plotting/previews/render.py) are in `plotting/previews/`; regenerate them with `uv run python -m plotting.previews.render`.
 
 ## Reproduce the figures
 
@@ -35,8 +35,6 @@ The included [`plotting/source_data/`](plotting/source_data/) contains only the 
 ```sh
 uv run python -m plotting
 ```
-
-Myriad Pro is used when installed; otherwise the exporter uses Matplotlib's bundled DejaVu Sans. Set `VEP_FONT_DIR` to a directory containing licensed Myriad Pro fonts, or `VEP_FONT` to an installed family. The previews use Myriad Pro. A font change affects typography, not plotted values or physical panel scale.
 
 ## Analyze recordings
 
@@ -78,7 +76,7 @@ uv run python run.py --stage supplement
 uv run python run.py --stage plot
 ```
 
-Preparation refuses to replace existing data unless `--overwrite` is supplied. LDA reuses checkpoints only when their inputs and code match. To use raw calcium instead, pass `--signal calcium`; its input field is `Res/CaSigCorrected`, and its data/results are written separately. Only deconvolved results are included here.
+Preparation stage (`preprocess.prepare`) does not replace existing data unless `--overwrite` is supplied. LDA reuses checkpoints only when their inputs and code match. To use raw calcium instead, pass `--signal calcium`; its input field is `Res/CaSigCorrected`, and its data/results are written separately. Only deconvolved results are included here.
 
 ### Numerical protocol
 
@@ -89,9 +87,7 @@ Preparation refuses to replace existing data unless `--overwrite` is supplied. L
 - Sessions are averaged within mouse; mice receive equal weight. Intervals use 5,000 mouse-bootstrap resamples. Draws and folds are technical repeats.
 - Within-area alignment uses training centroids and rotates held-out centroids without scaling. Subsequent cross-area registration and PCA use group means and are descriptive. Ordinary cosine, distance and radius retain finite-trial noise; F also includes peak-selection bias.
 
-Factorial inference uses nparLD 2.3.3 with rearing × area × time × panel-specific factor, incomplete records retained, and Holm correction across four main effects within each panel. C uses chance-normalized accuracy; F uses log radius. Two-sided exact NR–DR rank-sum tests use 180° similarity (B), orientation accuracy (C), full-space radius (D), log(high/low) peak radius (F), and transfer accuracy (G). Holm families contain two timepoints per area/endpoint for B–F and six timepoint × transition comparisons per area for G. The included figures cover 116 session–area populations from 72 contributing sessions and 27 mice; small groups limit inference.
-
-### Supplementary panels
+#### Supplementary panels
 
 The notebook exports each supplement separately:
 
@@ -108,9 +104,9 @@ The notebook exports each supplement separately:
 
 Orientation contrasts subtract angles **within each mouse and timepoint**: C(180°) − C(90°) for cosine, d(90°) − d(180°) for distance. Pointwise 95% intervals bootstrap these mouse differences, preserving their covariance. Baseline and chronic retain every eligible mouse independently; longitudinal pairing is not required.
 
-These exploratory follow-ups use two-sided exact NR–DR rank-sum tests, with Holm correction over two timepoints separately for each area, metric and endpoint. The numerical table also reports the stricter six-test endpoint × timepoint correction (`p_holm6_sensitivity`); plotted stars use the two-test family. No correction spans areas or metrics. Tests concern distributions of mouse values, not specifically their means. The alternative annotations do not change the main B panel's tests.
+#### Statistics
 
-Angular distances use the same pooled centroids and all 1,000 ten-neuron draws, taking distances before averaging pairs, draws, sessions within mouse, and mice. Zero self-distance is omitted from the plot; mirrored angles are identical and are not tested separately. Euclidean differences retain response scale and finite-trial noise. D-radius bars use the eight-direction squared radius in full ten-neuron space, displayed ×1,000, with the existing D tests and intervals.
+Statistical tests compare mice, with multiple recording sessions averaged within each mouse. Nonparametric factorial ANOVA-type tests (nparLD) assess rearing, visual area, timepoint and the panel-specific factor, accounting for repeated measurements and retaining incomplete records. NR–DR post-hoc comparisons use two-sided exact Wilcoxon rank-sum tests. Holm correction covers four main effects per panel and, separately, two timepoints per area/endpoint (six timepoint × transition comparisons for G). Supplementary orientation-contrast tests additionally report a stricter six-comparison sensitivity correction. Intervals are pointwise 95% mouse-bootstrap intervals; PCA views are descriptive.
 
 ## Organization
 
@@ -126,12 +122,3 @@ Angular distances use the same pooled centroids and all 1,000 ten-neuron draws, 
 Prepared data defaults to `data/<signal>/`, results to `results/<signal>/`. Set `VEP_DATA_DIR` or `VEP_RESULTS_DIR` before starting Python to change those locations. For another results folder, use `uv run python -m plotting --source /path/to/results --output /path/to/panels`, or set `RESULTS` in the notebook and restart its kernel.
 
 Raw recordings, intermediate arrays, caches, environments and generated exports are excluded from Git. The only bundled analysis data are the figure inputs in `source_data`; D/H preview images support this README. Notebook outputs are cleared to keep the repository small.
-
-## Tests
-
-```sh
-uv run pytest -q
-uv run pytest -q -m integration tests/test_exports.py
-# Requires R with nparLD 2.3.3; generates its own MATLAB recordings:
-uv run pytest -q -m integration tests/test_pipeline.py
-```
